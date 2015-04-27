@@ -174,6 +174,34 @@ func sendROI(src, dst *Metadata, srcUrl, dstUrl string) {
 	}
 }
 
+func sendLabelgraph(src, dst *Metadata, srcUrl, dstUrl string) {
+	// reads are pretty quick
+	// TODO: might want to split the POST into multiple chunks
+	// TODO: copy select properties over (might need support API)
+	url := srcUrl + "/subgraph"
+	// do not need to verify jsonschema which is currently time consuming
+	url2 := dstUrl + "/subgraph?unsafe=true"
+	fmt.Printf("Transfering: %s -> %s\n", url, url2)
+	resp, err := http.Get(url)
+	if err != nil {
+		fmt.Printf("Receive error: %s\n", err.Error())
+		os.Exit(1)
+	}
+	if resp.StatusCode != 200 && resp.StatusCode != 206 {
+		fmt.Printf("Bad status on receiving data: %d\n", resp.StatusCode)
+		os.Exit(1)
+	}
+	resp2, err := http.Post(url2, "application/json", resp.Body)
+	if err != nil {
+		fmt.Printf("Transmit error: %s\n", err.Error())
+		os.Exit(1)
+	}
+	if resp2.StatusCode != http.StatusOK {
+		fmt.Printf("Bad status on sending data: %d\n", resp2.StatusCode)
+		os.Exit(1)
+	}
+}
+
 func sendKeyvalue(src, dst *Metadata, srcUrl, dstUrl string) {
 	// Get all the keys
 	keysUrl := srcUrl + "/keys"
@@ -250,6 +278,13 @@ func transferData(src, dst string) {
 			os.Exit(1)
 		}
 		sendROI(srcMetadata, dstMetadata, src, dst)
+
+	case "labelgraph":
+		if dsttype != "labelgraph" {
+			fmt.Printf("Can't transfer %s to %s, need labelgraph destination\n", srctype, dsttype)
+			os.Exit(1)
+		}
+		sendLabelgraph(srcMetadata, dstMetadata, src, dst)
 
 	case "keyvalue":
 		if dsttype != "keyvalue" {
